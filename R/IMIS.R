@@ -1,4 +1,4 @@
-IMIS <- function(B, B.re, number_k, D){
+IMIS <- function(B=1000, B.re=3000, number_k=100, D=0){
 	B0 = B*10
 	X_all = X_k = sample.prior(B0)				# Draw initial samples from the prior distribution
 	if (is.vector(X_all))	Sig2_global = var(X_all)	# the prior covariance
@@ -37,6 +37,8 @@ IMIS <- function(B, B.re, number_k, D){
 			which_remain = which(Weights>label_weight$x[B0]) 	# the candidate inputs for the starting points
 			size_remain = length(which_remain)
 			for (i in 1:D){
+				important = NULL
+				if (length(which_remain)>0)
 				important = which_remain[which(Weights[which_remain]==max(Weights[which_remain]))]
 				if (length(important)>1)	important = sample(important,1)	
 				if (is.vector(X_all))	X_imp = X_all[important]
@@ -46,15 +48,20 @@ IMIS <- function(B, B.re, number_k, D){
 				which_remain = setdiff(which_remain, which_exclude)
 				posterior = function(theta){	-log(prior(theta))-log(likelihood(theta)) } 
 
-			if (is.vector(X_all)){	
+			if (is.vector(X_all)){
+				if (length(important)==0)	X_imp = center_all[1]
 				optimizer = optim(X_imp, posterior, method="BFGS", hessian=TRUE, 
 						control=list(parscale=sqrt(Sig2_global)/10,maxit=5000))
+				print(paste("maximum posterior=", round(-optimizer$value,2), ", likelihood=", round(log(likelihood(optimizer$par)),2), 
+				", prior=", round(log(prior(optimizer$par)),2), ", time used=", round(ptm.use/60,2), "minutes, convergence=", optimizer$convergence))
 				center_all = c(center_all, optimizer$par)
 				sigma_all[[i]] = solve(optimizer$hessian)
 				X_k = c(X_k, rnorm(B, optimizer$par, sqrt(sigma_all[[i]])) )			# Draw new samples
+				distance_remain = abs(X_all[which_remain]-optimizer$par)
 			}
 			if (is.matrix(X_all)){	
 				# The rough optimizer uses the Nelder-Mead algorithm.
+				if (length(important)==0)	X_imp = center_all[1,]
 				ptm.opt = proc.time()
 				optimizer = optim(X_imp, posterior, method="Nelder-Mead", 
 				control=list(maxit=1000, parscale=sqrt(diag(Sig2_global))) )
@@ -75,10 +82,10 @@ IMIS <- function(B, B.re, number_k, D){
 					hessian = eigen(optimizer$hessian)$vectors %*% diag(eigen.values) %*% t(eigen(optimizer$hessian)$vectors)
 					sigma_all[[i]] = solve(hessian + diag(1/diag(Sig2_global)) )
 				}
-				X_k = rbind(X_k, rmvnorm(B, optimizer$par, sigma_all[[1]]) )			# Draw new samples
+				X_k = rbind(X_k, rmvnorm(B, optimizer$par, sigma_all[[i]]) )			# Draw new samples
+				distance_remain = mahalanobis(X_all[which_remain,], optimizer$par, diag(diag(Sig2_global)) )
 			}
 				# exclude the neighborhood of the local optima 
-				distance_remain = abs(X_all[which_remain]-optimizer$par)
 				label_dist = sort(distance_remain, decreasing = FALSE, index=TRUE)
 				which_exclude = union( which_exclude, which_remain[label_dist$ix[1:floor(size_remain/D)]])
 				which_remain = setdiff(which_remain, which_exclude)
@@ -119,7 +126,8 @@ IMIS <- function(B, B.re, number_k, D){
 			}
 		}
 		if (k>1){
-			gaussian_new = matrix(0, D+k-1, length(X_all) )
+			if (is.vector(X_all))	gaussian_new = matrix(0, D+k-1, length(X_all) )
+			if (is.matrix(X_all))	gaussian_new = matrix(0, D+k-1, dim(X_all)[1] )
 			if (is.matrix(X_all)){
 				gaussian_new[1:(D+k-2), 1:(dim(X_all)[1]-B)] = gaussian_all
 				gaussian_new[D+k-1, ] = dmvnorm(X_all, X_imp, sigma_all[[D+k-1]])

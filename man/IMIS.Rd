@@ -2,7 +2,7 @@
 \alias{IMIS}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Incremental Mixture Importance Sampling}
-\description{IMIS algorithm draws samples from the posterior distribution of multivariate variable. The user has to define the following R functions in advance: prior(x) calculates prior density of x, likelihood(x) calculates the likelihood of x, and sample.prior(n) draws n samples from the prior distribution.}
+\description{IMIS algorithm draws samples from the posterior distribution of multivariate variable. The user has to define the following R functions in advance: prior(x) calculates prior density of x, likelihood(x) calculates the likelihood of x, and sample.prior(n) draws n samples from the prior distribution. For multivariate x, the prior or the likelihood of a vector should be a scalar, and the prior or the likelihood of a matrix should be a vector.}
 
 \usage{
 IMIS(B, B.re, number_k, D)
